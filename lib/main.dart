@@ -174,8 +174,74 @@ class ReminderCenterState extends State<ReminderCenter>{
  ]));}
 }
 
-class Trend extends StatelessWidget{const Trend({super.key,required this.app});final DnbState app;
- @override Widget build(BuildContext c){final all=app.plants.expand((p)=>p.history.map((h)=>{'plant':p.name,...h})).toList()..sort((a,b)=>(b['date']??'').toString().compareTo((a['date']??'').toString()));final cut=DateTime.now().subtract(const Duration(days:90));final recent=all.where((h){final d=DateTime.tryParse(h['date']??'');return d!=null&&d.isAfter(cut);}).toList();return Scaffold(appBar:AppBar(title:const Text('نمودار وضعیت')),body:recent.isEmpty?const Center(child:Text('برای نمایش روند، ابتدا وضعیت گیاه را ثبت کن')):ListView(padding:const EdgeInsets.all(12),children:[const Text('ثبت‌های ۹۰ روز اخیر',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),for(final h in recent)Card(elevation:0,child:ListTile(leading:const Icon(Icons.show_chart,color:green),title:Text(h['plant'].toString()+' • '+h['condition'].toString()),subtitle:Text((h['date']??'').toString().split('T').first+'  '+(h['notes']??''))))]));}
+class Trend extends StatefulWidget{
+ const Trend({super.key,required this.app});
+ final DnbState app;
+ @override State<Trend> createState()=>TrendState();
+}
+class TrendState extends State<Trend>{
+ String? selectedId;
+ @override Widget build(BuildContext c){
+  final plants=widget.app.plants;
+  if(plants.isEmpty)return Scaffold(appBar:AppBar(title:const Text('نمودار وضعیت')),body:const Center(child:Text('هنوز گیاهی ثبت نشده است')));
+  selectedId??=plants.first.id;
+  final plant=plants.firstWhere((p)=>p.id==selectedId,orElse:()=>plants.first);
+  final cutoff=DateTime.now().subtract(const Duration(days:90));
+  final entries=plant.history.where((h){final d=DateTime.tryParse((h['date']??'').toString());return d!=null&&!d.isBefore(cutoff);}).toList()
+   ..sort((a,b)=>(a['date']??'').toString().compareTo((b['date']??'').toString()));
+  return Scaffold(appBar:AppBar(title:const Text('نمودار وضعیت')),body:ListView(padding:const EdgeInsets.all(16),children:[
+   DropdownButtonFormField<String>(value:plant.id,decoration:const InputDecoration(labelText:'انتخاب گیاه',border:OutlineInputBorder()),items:plants.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.name))).toList(),onChanged:(v)=>setState(()=>selectedId=v)),
+   const SizedBox(height:14),
+   Text('روند وضعیت \${plant.name} در ۹۰ روز اخیر',style:const TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
+   const SizedBox(height:8),
+   if(entries.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(20),child:Text('در سه ماه اخیر وضعیتی ثبت نشده است. از شناسنامه گیاه، «ثبت وضعیت جدید» را انتخاب کن.')))
+   else Card(elevation:0,child:Padding(padding:const EdgeInsets.fromLTRB(8,16,8,8),child:SizedBox(height:230,child:CustomPaint(painter:PlantTrendPainter(entries),size:const Size(double.infinity,230))))),
+   const SizedBox(height:10),
+   const Text('مقیاس کیفی: نیازمند بررسی، ضعیف، متوسط، خوب، عالی. این نمودار فقط وضعیت‌های ثبت‌شده را نمایش می‌دهد و پیش‌بینی سلامت نیست.',style:TextStyle(fontSize:11,color:Colors.black54)),
+   const Divider(height:28),
+   const Text('سوابق ثبت‌شده',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
+   for(final h in entries.reversed)ListTile(leading:const Icon(Icons.history,color:green),title:Text((h['condition']??'').toString()),subtitle:Text((h['date']??'').toString().split('T').first+'  '+(h['notes']??''))),
+  ]));
+ }
+}
+class PlantTrendPainter extends CustomPainter{
+ PlantTrendPainter(this.entries);
+ final List<Map<String,dynamic>> entries;
+ static const labels=['نیازمند بررسی','ضعیف','متوسط','خوب','عالی'];
+ int level(String value)=>switch(value){'عالی'=>5,'خوب'=>4,'متوسط'=>3,'ضعیف'=>2,_=>1};
+ @override void paint(Canvas canvas,Size size){
+  const left=68.0,right=12.0,top=14.0,bottom=34.0;
+  final w=size.width-left-right,h=size.height-top-bottom;
+  final grid=Paint()..color=Colors.black12..strokeWidth=1;
+  final line=Paint()..color=green..strokeWidth=2.8..style=PaintingStyle.stroke..strokeCap=StrokeCap.round..strokeJoin=StrokeJoin.round;
+  final dot=Paint()..color=green..style=PaintingStyle.fill;
+  for(var i=0;i<5;i++){
+   final y=top+h-(i*h/4);
+   canvas.drawLine(Offset(left,y),Offset(left+w,y),grid);
+   final tp=TextPainter(text:TextSpan(text:labels[i],style:const TextStyle(fontSize:10,color:Colors.black54)),textDirection:TextDirection.rtl)..layout(maxWidth:left-6);
+   tp.paint(canvas,Offset(left-tp.width-6,y-tp.height/2));
+  }
+  if(entries.isEmpty)return;
+  final path=Path();
+  for(var i=0;i<entries.length;i++){
+   final x=entries.length==1?left+w/2:left+(i*w/(entries.length-1));
+   final y=top+h-((level((entries[i]['condition']??'').toString())-1)*h/4);
+   if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
+  }
+  if(entries.length>1)canvas.drawPath(path,line);
+  for(var i=0;i<entries.length;i++){
+   final x=entries.length==1?left+w/2:left+(i*w/(entries.length-1));
+   final y=top+h-((level((entries[i]['condition']??'').toString())-1)*h/4);
+   canvas.drawCircle(Offset(x,y),4.5,dot);
+  }
+  for(final pair in [0,entries.length-1].toSet()){
+   final date=(entries[pair]['date']??'').toString().split('T').first;
+   final tp=TextPainter(text:TextSpan(text:date,style:const TextStyle(fontSize:9,color:Colors.black54)),textDirection:TextDirection.ltr)..layout();
+   final x=pair==0?left:left+w-tp.width;
+   tp.paint(canvas,Offset(x,top+h+8));
+  }
+ }
+ @override bool shouldRepaint(covariant PlantTrendPainter old)=>old.entries!=entries;
 }
 class Propagation extends StatelessWidget{const Propagation({super.key});@override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('تکثیر')),body:ListView(padding:const EdgeInsets.all(16),children:[Text('راهنمای پایه تکثیر',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),SizedBox(height:12),Text('• قلمه ساقه: ابزار تمیز، برش زیر گره و بستر سبک و مرطوب.\n\n• قلمه برگ: فقط برای گونه‌هایی که از برگ تکثیر می‌شوند.\n\n• تقسیم بوته: هر بخش باید ریشه و جوانه مستقل داشته باشد.\n\n• بذر: عمق کاشت، دما و نور به گونه گیاه وابسته است.\n\nاین راهنما عمومی است؛ روش مناسب را برای گونه موردنظر بررسی کن.') ]));}
 class Settings extends StatelessWidget{const Settings({super.key,required this.app});final DnbState app;
