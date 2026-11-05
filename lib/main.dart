@@ -20,7 +20,7 @@ class DnbApp extends StatefulWidget{const DnbApp({super.key});@override State<Dn
 class DnbState extends State<DnbApp>{
  List<Plant> plants=[];List<Map<String,dynamic>> careReminders=[];bool ready=false,reminders=true;String lang='فارسی',quiet='۲۲:۰۰ تا ۰۸:۰۰';
  @override void initState(){super.initState();load();}
- Future<void> load()async{final s=await SharedPreferences.getInstance();try{plants=(jsonDecode(s.getString('plants')??'[]') as List).map((e)=>Plant.from(e)).toList();}catch(_){}lang=s.getString('lang')??lang;reminders=s.getBool('reminders')??true;quiet=s.getString('quiet')??quiet;try{careReminders=List<Map<String,dynamic>>.from((jsonDecode(s.getString('care_reminders')??'[]') as List).map((e)=>Map<String,dynamic>.from(e)));}catch(_){}if(mounted)setState(()=>ready=true);}
+ Future<void> load()async{final s=await SharedPreferences.getInstance();try{plants=(jsonDecode(s.getString('plants')??'[]') as List).map((e)=>Plant.from(e)).toList();}catch(_){}lang=s.getString('lang')??lang;reminders=s.getBool('reminders')??true;quiet=s.getString('quiet')??quiet;try{careReminders=List<Map<String,dynamic>>.from((jsonDecode(s.getString('care_reminders')??'[]') as List).map((e)=>Map<String,dynamic>.from(e)));}catch(_){}if(reminders){for(final item in careReminders){try{await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}catch(_){}}}if(mounted)setState(()=>ready=true);}
  Future<void> save()async{final s=await SharedPreferences.getInstance();await s.setString('plants',jsonEncode(plants.map((e)=>e.json()).toList()));await s.setString('lang',lang);await s.setBool('reminders',reminders);await s.setString('quiet',quiet);await s.setString('care_reminders',jsonEncode(careReminders));if(mounted)setState((){});}
  Future<void> add(Plant p)async{setState(()=>plants.insert(0,p));await save();}
  String newPlantId()=> 'DNB-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(0x7fffffff).toRadixString(16)}';
@@ -40,7 +40,21 @@ class DnbState extends State<DnbApp>{
   }
  }
 
- Future<void> addCareReminder(Map<String,dynamic> item)async{careReminders.add(item);await save();if(reminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}
+ int newReminderId(){
+ final random=Random.secure();
+ for(var i=0;i<100;i++){
+  final candidate=random.nextInt(900000000)+1;
+  if(!careReminders.any((x)=>x['id']==candidate))return candidate;
+ }
+ throw StateError('شناسه یکتای یادآوری ساخته نشد');
+}
+Future<void> addCareReminder(Map<String,dynamic> item)async{
+ if(reminders){
+  await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);
+ }
+ careReminders.add(item);
+ await save();
+}
  Future<void> removeCareReminder(Map<String,dynamic> item)async{await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000);careReminders.removeWhere((x)=>x['id']==item['id']);await save();}
  Future<void> setReminderEnabled(bool enabled)async{reminders=enabled;if(enabled){for(final item in careReminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}else{for(final item in careReminders){await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000);}}await save();}
  Future<void> updateQuietHours(String value)async{quiet=value;if(reminders){for(final item in careReminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}await save();}
@@ -116,7 +130,7 @@ class ReminderCenterState extends State<ReminderCenter>{
  @override void initState(){super.initState();final names=widget.app.plants.where((p)=>p.active).map((p)=>p.name).toList();if(names.isNotEmpty)plant=names.first;}
  Future<void> chooseDate()async{final d=await showDatePicker(context:context,initialDate:date.isBefore(DateTime.now())?DateTime.now():date,firstDate:DateTime.now(),lastDate:DateTime.now().add(const Duration(days:730)));if(d!=null)setState(()=>date=d);}
  Future<void> chooseTime()async{final t=await showTimePicker(context:context,initialTime:time);if(t!=null)setState(()=>time=t);}
- Future<void> saveReminder()async{if(title.text.trim().isEmpty){toast(context,'عنوان یادآوری را بنویس');return;}var when=DateTime(date.year,date.month,date.day,time.hour,time.minute);if(repeat=='یک‌بار'&&!when.isAfter(DateTime.now())){toast(context,'زمان یادآوری باید در آینده باشد');return;}setState(()=>busy=true);final id=DateTime.now().millisecondsSinceEpoch%2000000000;final item=<String,dynamic>{'id':id,'plant':plant,'title':title.text.trim(),'when':when.toIso8601String(),'repeat':repeat,'priority':priority};try{await widget.app.addCareReminder(item);if(mounted){title.clear();toast(context,'یادآوری ذخیره و زمان‌بندی شد');}}catch(e){if(mounted)toast(context,'ذخیره شد، اما زمان‌بندی اعلان با خطا روبه‌رو شد: $e');}if(mounted)setState(()=>busy=false);}
+ Future<void> saveReminder()async{if(title.text.trim().isEmpty){toast(context,'عنوان یادآوری را بنویس');return;}var when=DateTime(date.year,date.month,date.day,time.hour,time.minute);if(repeat=='یک‌بار'&&!when.isAfter(DateTime.now())){toast(context,'زمان یادآوری باید در آینده باشد');return;}setState(()=>busy=true);final id=widget.app.newReminderId();final item=<String,dynamic>{'id':id,'plant':plant,'title':title.text.trim(),'when':when.toIso8601String(),'repeat':repeat,'priority':priority};try{await widget.app.addCareReminder(item);if(mounted){title.clear();toast(context,'یادآوری ذخیره و زمان‌بندی شد');}}catch(e){if(mounted)toast(context,'ذخیره شد، اما زمان‌بندی اعلان با خطا روبه‌رو شد: $e');}if(mounted)setState(()=>busy=false);}
  @override Widget build(BuildContext c){final names=widget.app.plants.where((p)=>p.active).map((p)=>p.name).toSet().toList();if(!names.contains(plant))plant=names.isEmpty?'عمومی':names.first;return Scaffold(appBar:AppBar(title:const Text('یادآوری و آلارم')),body:ListView(padding:const EdgeInsets.all(16),children:[
  const Text('یادآوری مراقبت',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),const SizedBox(height:10),
  TextField(controller:title,decoration:const InputDecoration(labelText:'عنوان کار',hintText:'مثلاً بررسی رطوبت خاک یا کوددهی',border:OutlineInputBorder())),
