@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -27,6 +28,7 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
   bool busyLocation = false, busyPlant = false, hasLightSensor = false;
   List<Map<String, dynamic>> candidates = [];
   double? lux;
+  StreamSubscription<double>? lightSubscription;
   @override void initState() { super.initState(); loadKey(); initLight(); }
   Future<void> loadKey() async {
     final p = await SharedPreferences.getInstance();
@@ -44,7 +46,7 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
     try {
       hasLightSensor = await AmbientLightService.hasSensor();
       if (!hasLightSensor) { if (mounted) setState(() => light = 'این گوشی حسگر نور محیط ندارد.'); return; }
-      AmbientLightService.luxStream().listen((v) {
+      lightSubscription = AmbientLightService.luxStream().listen((v) {
         if (!mounted) return;
         final value = v.toDouble();
         setState(() { lux = value; light = '${value.toStringAsFixed(0)} لوکس — ${lightLabel(value)}'; });
@@ -189,5 +191,5 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
           style: TextStyle(fontSize: 11, color: Colors.black54))])),
       Text(status, style: const TextStyle(color: Colors.black54)), const SizedBox(height: 12)
     ]));
-  @override void dispose() { keyController.dispose(); super.dispose(); }
+  @override void dispose() { lightSubscription?.cancel(); keyController.dispose(); super.dispose(); }
 }
