@@ -13,4 +13,13 @@ void main() {
     expect(find.text('دانا زبان گیاه شما'), findsOneWidget);
     expect(find.text('گیاهان من'), findsWidgets);
   });
+  test('plant records receive distinct stable identifiers', () {
+    final state = DnbState();
+    final first = state.newPlantId();
+    final second = state.newPlantId();
+    expect(first, startsWith('DNB-'));
+    expect(second, startsWith('DNB-'));
+    expect(first, isNot(second));
+  });
+
 }
