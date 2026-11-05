@@ -39,7 +39,8 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
       if (!hasLightSensor) { if (mounted) setState(() => light = 'این گوشی حسگر نور محیط ندارد.'); return; }
       LightSensor.luxStream().listen((v) {
         if (!mounted) return;
-        setState(() { lux = v; light = '${v.toStringAsFixed(0)} لوکس — ${lightLabel(v)}'; });
+        final value = v.toDouble();
+        setState(() { lux = value; light = '${value.toStringAsFixed(0)} لوکس — ${lightLabel(value)}'; });
       }, onError: (_) { if (mounted) setState(() => light = 'خواندن حسگر نور ممکن نشد.'); });
     } catch (_) { if (mounted) setState(() => light = 'حسگر نور در دسترس نیست.'); }
   }
