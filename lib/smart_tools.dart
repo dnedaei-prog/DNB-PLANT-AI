@@ -95,7 +95,7 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
     setState(() { busyPlant = true; plantResult = 'عکس در حال شناسایی است...'; });
     try {
       final req = http.MultipartRequest('POST', Uri.https('my-api.plantnet.org',
-        '/v2/identify/all', {'api-key': apiKey, 'lang': 'fa', 'nb-results': '5'}));
+        '/v2/identify/all', {'api-key': apiKey, 'nb-results': '5'}));
       req.files.add(await http.MultipartFile.fromPath('images', path));
       req.fields['organs'] = 'auto';
       final streamed = await req.send().timeout(const Duration(seconds: 60));
