@@ -16,10 +16,6 @@ class ReminderService {
     await plugin.initialize(const InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     ));
-    final android = plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    await android?.requestNotificationsPermission();
-    exactAllowed = await android?.requestExactAlarmsPermission() ?? false;
     ready = true;
   }
 
@@ -64,6 +60,10 @@ class ReminderService {
     required String quietHours,
   }) async {
     if (!ready) await initialize();
+    final android = plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await android?.requestNotificationsPermission();
+    exactAllowed = await android?.requestExactAlarmsPermission() ?? false;
     final adjusted = respectQuietHours(when, quietHours);
     final channel = priority >= 2 ? 'dnb_urgent' : priority == 1 ? 'dnb_important' : 'dnb_normal';
     final details = NotificationDetails(android: AndroidNotificationDetails(
