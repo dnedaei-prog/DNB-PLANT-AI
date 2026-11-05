@@ -24,6 +24,55 @@ jobs:
       - name: Generate Android platform files
         run: flutter create . --platforms=android --org com.dnbplantai
 
+      - name: Configure Android scheduled notifications
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          content = manifest.read_text()
+          permissions = '''
+              <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+          '''
+          if "android.permission.RECEIVE_BOOT_COMPLETED" not in content:
+              end = content.find(">")
+              content = content[:end + 1] + permissions + content[end + 1:]
+          receivers = '''
+              <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+              <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+                  <intent-filter>
+                      <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                      <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                      <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                      <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+                  </intent-filter>
+              </receiver>
+          '''
+          if "ScheduledNotificationReceiver" not in content:
+              content = content.replace("</application>", receivers + "\\n</application>")
+          manifest.write_text(content)
+
+          gradle_kts = Path("android/app/build.gradle.kts")
+          gradle = Path("android/app/build.gradle")
+          if gradle_kts.exists():
+              g = gradle_kts.read_text()
+              if "isCoreLibraryDesugaringEnabled" not in g:
+                  g = g.replace("compileOptions {", "compileOptions {\\n        isCoreLibraryDesugaringEnabled = true", 1)
+              if "coreLibraryDesugaring(" not in g:
+                  if "dependencies {" in g:
+                      g = g.replace("dependencies {", 'dependencies {\\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")', 1)
+                  else:
+                      g += '\\ndependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") }\\n'
+              gradle_kts.write_text(g)
+          elif gradle.exists():
+              g = gradle.read_text()
+              if "coreLibraryDesugaringEnabled" not in g:
+                  g = g.replace("compileOptions {", "compileOptions {\\n        coreLibraryDesugaringEnabled true", 1)
+              if "coreLibraryDesugaring " not in g:
+                  g += "\\ndependencies { coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4' }\\n"
+              gradle.write_text(g)
+          PY
+
       - name: Get dependencies
         run: flutter pub get
 
