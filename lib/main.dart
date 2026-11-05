@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'reminder_service.dart';
+import 'smart_tools.dart';
 
 Future<void> main() async { WidgetsFlutterBinding.ensureInitialized(); try { await ReminderService.initialize(); } catch (_) {} runApp(const DnbApp()); }
 const green=Color(0xFF167B62),pale=Color(0xFFE8F4EE);
@@ -41,6 +42,7 @@ class Home extends StatelessWidget{const Home({super.key,required this.app});fin
  Container(padding:const EdgeInsets.all(22),decoration:BoxDecoration(borderRadius:BorderRadius.circular(24),gradient:const LinearGradient(colors:[Color(0xFF125C50),Color(0xFF279B78)])),child:const Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(Icons.energy_savings_leaf,color:Colors.white,size:38),SizedBox(height:12),Text('دانا زبان گیاه شما',style:TextStyle(color:Colors.white,fontSize:23,fontWeight:FontWeight.bold)),SizedBox(height:6),Text('همراه ثبت و مراقبت آگاهانه از گیاهان',style:TextStyle(color:Colors.white))])),
  const SizedBox(height:12),Row(children:[stat('گیاهان من',active),const SizedBox(width:8),stat('اطلاعات ذخیره',saved)]),const SizedBox(height:14),
  tile(c,'ثبت جدید','ثبت عکس و وضعیت اولیه',Icons.add_a_photo,()=>go(c,Register(app:app))),
+ tile(c,'هوش گیاه و محیط','تشخیص عکس، مکان، آب‌وهوا، نور و خاک',Icons.auto_awesome,()=>go(c,const SmartToolsPage())),
  tile(c,'گیاهان من','شناسنامه مستقل و تاریخچه هر گیاه',Icons.local_florist,()=>go(c,PlantList(app:app,active:true))),
  tile(c,'اطلاعات ذخیره','موارد ذخیره‌شده برای بررسی بعدی',Icons.bookmark,()=>go(c,PlantList(app:app,active:false))),
  tile(c,'یادآوری و آلارم','زمان‌بندی مراقبت و هشدارهای گیاهان',Icons.notifications_active,()=>go(c,ReminderCenter(app:app))),
@@ -122,6 +124,6 @@ class Settings extends StatelessWidget{const Settings({super.key,required this.a
  DropdownButtonFormField<String>(value:app.lang,decoration:const InputDecoration(labelText:'زبان',border:OutlineInputBorder()),items:['فارسی','English','العربية'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v){app.lang=v??app.lang;app.save();}),
  SwitchListTile(value:app.reminders,onChanged:(v)=>app.setReminderEnabled(v),title:const Text('یادآوری‌ها'),subtitle:const Text('اعلان‌های واقعی برای زمان‌های ثبت‌شده؛ با امکان فعال و غیرفعال‌سازی')),
  ListTile(title:const Text('ساعات سکوت'),subtitle:Text(app.quiet),trailing:const Icon(Icons.edit),onTap:()async{final x=await showDialog<String>(context:c,builder:(d){final t=TextEditingController(text:app.quiet);return AlertDialog(title:const Text('ساعات سکوت'),content:TextField(controller:t,decoration:const InputDecoration(hintText:'مثلاً ۲۲:۰۰ تا ۰۸:۰۰')),actions:[TextButton(onPressed:()=>Navigator.pop(d),child:const Text('لغو')),FilledButton(onPressed:()=>Navigator.pop(d,t.text),child:const Text('ذخیره'))]);});if(x!=null){app.updateQuietHours(x);}}),
- const Divider(),const Text('حریم خصوصی',style:TextStyle(fontWeight:FontWeight.bold)),const Text('اطلاعات در حافظه محلی همین گوشی ذخیره می‌شود. حذف برنامه یا پاک‌کردن داده‌ها ممکن است اطلاعات را پاک کند. نسخه فعلی هنوز مکان‌یابی، آب‌وهوا، تشخیص تصویری هوشمند و اعلان خودکار ندارد.')
+ const Divider(),const Text('حریم خصوصی',style:TextStyle(fontWeight:FontWeight.bold)),const Text('اطلاعات در حافظه محلی همین گوشی ذخیره می‌شود. حذف برنامه یا پاک‌کردن داده‌ها ممکن است اطلاعات را پاک کند. مکان‌یابی و آب‌وهوا با اجازه شما فعال می‌شوند؛ تشخیص گیاه به کلید Pl@ntNet نیاز دارد. تحلیل خودکار تصویر خاک هنوز فعال نشده است.')
  ]));
 }
