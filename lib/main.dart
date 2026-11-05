@@ -14,11 +14,18 @@ class Plant{
 }
 class DnbApp extends StatefulWidget{const DnbApp({super.key});@override State<DnbApp> createState()=>DnbState();}
 class DnbState extends State<DnbApp>{
- List<Plant> plants=[];bool ready=false,reminders=true;String lang='فارسی',quiet='۲۲:۰۰ تا ۰۸:۰۰';
+ List<Plant> plants=[];bool ready=false,reminders=true,inventoryImported=false;String lang='فارسی',quiet='۲۲:۰۰ تا ۰۸:۰۰';
  @override void initState(){super.initState();load();}
- Future<void> load()async{final s=await SharedPreferences.getInstance();try{plants=(jsonDecode(s.getString('plants')??'[]') as List).map((e)=>Plant.from(e)).toList();}catch(_){}lang=s.getString('lang')??lang;reminders=s.getBool('reminders')??true;quiet=s.getString('quiet')??quiet;if(mounted)setState(()=>ready=true);}
+ Future<void> load()async{final s=await SharedPreferences.getInstance();try{plants=(jsonDecode(s.getString('plants')??'[]') as List).map((e)=>Plant.from(e)).toList();}catch(_){}lang=s.getString('lang')??lang;reminders=s.getBool('reminders')??true;quiet=s.getString('quiet')??quiet;inventoryImported=s.getBool('initial_inventory_imported')??false;if(mounted)setState(()=>ready=true);}
  Future<void> save()async{final s=await SharedPreferences.getInstance();await s.setString('plants',jsonEncode(plants.map((e)=>e.json()).toList()));await s.setString('lang',lang);await s.setBool('reminders',reminders);await s.setString('quiet',quiet);if(mounted)setState((){});}
- void add(Plant p){setState(()=>plants.insert(0,p));save();}void refresh(){setState((){});save();}
+ void add(Plant p){setState(()=>plants.insert(0,p));save();}
+ Future<int> importInitialInventory()async{
+  const names=['پونه','برگ عبایی','اسپاتی‌فیلوم','فیلودندرون','آگلونما','کالانکوآ گلدار','سرخس فوجر','ریحان بنفش','نعنا فلفلی','نخل اریکا','کاج لاوسون','فیلودندرون پرتقالی','فیلودندرون کنگویی','به‌لیمو','مرجان','میخک هندی','گاردنیا'];
+  final existing=plants.map((p)=>p.name.trim()).toSet();final now=DateTime.now();int added=0;
+  for(var i=0;i<names.length;i++){final n=names[i];if(existing.contains(n))continue;final d=now.add(Duration(milliseconds:i));plants.add(Plant(id:'DNB-INIT-${(i+1).toString().padLeft(2,'0')}',name:n,place:'نامشخص',condition:'نیازمند بررسی',notes:'از فهرست اولیه کاربر وارد شده؛ وضعیت و محل نگهداری هنوز تأیید نشده است.',photo:'',created:d.toIso8601String(),active:true,history:[]));added++;}
+  inventoryImported=true;final prefs=await SharedPreferences.getInstance();await prefs.setBool('initial_inventory_imported',true);await save();return added;
+ }
+ void refresh(){setState((){});save();}
  @override Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,title:'DNB Plant AI',theme:ThemeData(useMaterial3:true,colorScheme:ColorScheme.fromSeed(seedColor:green),scaffoldBackgroundColor:const Color(0xFFF5F8F5)),home:Directionality(textDirection:TextDirection.rtl,child:ready?Home(app:this):const Scaffold(body:Center(child:CircularProgressIndicator()))));
 }
 void go(BuildContext c,Widget w)=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Directionality(textDirection:TextDirection.rtl,child:w)));
