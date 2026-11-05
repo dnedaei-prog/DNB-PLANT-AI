@@ -55,8 +55,8 @@ Future<void> addCareReminder(Map<String,dynamic> item)async{
  careReminders.add(item);
  await save();
 }
- Future<void> removeCareReminder(Map<String,dynamic> item)async{await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000);careReminders.removeWhere((x)=>x['id']==item['id']);await save();}
- Future<void> setReminderEnabled(bool enabled)async{reminders=enabled;if(enabled){for(final item in careReminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}else{for(final item in careReminders){await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000);}}await save();}
+ Future<void> removeCareReminder(Map<String,dynamic> item)async{await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000000);careReminders.removeWhere((x)=>x['id']==item['id']);await save();}
+ Future<void> setReminderEnabled(bool enabled)async{reminders=enabled;if(enabled){for(final item in careReminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}else{for(final item in careReminders){await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000000);}}await save();}
  Future<void> updateQuietHours(String value)async{quiet=value;if(reminders){for(final item in careReminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}await save();}
  Future<void> snoozeCareReminder(Map<String,dynamic> item)async{await ReminderService.snooze(id:item['id'],plant:item['plant'],title:item['title'],priority:item['priority'],quietHours:quiet);}
  void refresh(){setState((){});save();}
