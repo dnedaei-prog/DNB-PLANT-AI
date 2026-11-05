@@ -130,14 +130,14 @@ class HomePage extends StatelessWidget {
   void _openSection(BuildContext context, _Section section) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SectionPage(section: section),
+        builder: (_) => _SectionPage(section: section),
       ),
     );
   }
 }
 
-class SectionPage extends StatelessWidget {
-  const SectionPage({super.key, required this.section});
+class _SectionPage extends StatelessWidget {
+  const _SectionPage({super.key, required this.section});
 
   final _Section section;
 
