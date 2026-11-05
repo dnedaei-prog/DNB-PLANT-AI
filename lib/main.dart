@@ -84,6 +84,10 @@ class Home extends StatelessWidget{const Home({super.key,required this.app});fin
 class Register extends StatefulWidget{const Register({super.key,required this.app});final DnbState app;@override State<Register> createState()=>RegisterState();}
 class RegisterState extends State<Register>{
  final name=TextEditingController(),notes=TextEditingController();String place='بالکن',condition='متوسط',photo='';bool active=true,busy=false;
+ Future<void> identifyForRegistration()async{
+  final result=await Navigator.push<String>(context,MaterialPageRoute(builder:(_)=>const SmartToolsPage()));
+  if(result!=null&&result.trim().isNotEmpty&&mounted)setState(()=>name.text=result.trim());
+ }
  Future<void> pick(ImageSource source)async{
   final x=await ImagePicker().pickImage(source:source,imageQuality:82,maxWidth:1600);
   if(x==null)return;
@@ -93,7 +97,7 @@ class RegisterState extends State<Register>{
  Future<void> submit()async{if(name.text.trim().isEmpty){toast(context,'نام گیاه را وارد کن');return;}setState(()=>busy=true);final d=DateTime.now();final p=Plant(id:widget.app.newPlantId(),name:name.text.trim(),place:place,condition:condition,notes:notes.text.trim(),photo:photo,created:d.toIso8601String(),active:active,history:[{'date':d.toIso8601String(),'condition':condition,'notes':notes.text.trim()}]);await widget.app.add(p);if(!mounted)return;Navigator.pop(context);go(context,Chat(app:widget.app,initial:'برای گیاه '+p.name+' یک یادداشت مراقبتی ثبت کن.'));}
  @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('ثبت جدید')),body:ListView(padding:const EdgeInsets.all(18),children:[
  const Text('شناسنامه اولیه گیاه',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),const SizedBox(height:14),TextField(controller:name,decoration:const InputDecoration(labelText:'نام گیاه یا نام دلخواه',hintText:'مثلاً شمعدانی شماره ۱',border:OutlineInputBorder())),
- const SizedBox(height:12),DropdownButtonFormField<String>(value:place,decoration:const InputDecoration(labelText:'محل نگهداری',border:OutlineInputBorder()),items:['بالکن','داخل منزل','حیاط','گلخانه','سایه','آفتاب مستقیم'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>place=v??place)),
+ const SizedBox(height:8),OutlinedButton.icon(onPressed:identifyForRegistration,icon:const Icon(Icons.auto_awesome),label:const Text('شناسایی نام گیاه از عکس با دانا')),const SizedBox(height:12),DropdownButtonFormField<String>(value:place,decoration:const InputDecoration(labelText:'محل نگهداری',border:OutlineInputBorder()),items:['بالکن','داخل منزل','حیاط','گلخانه','سایه','آفتاب مستقیم'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>place=v??place)),
  const SizedBox(height:12),DropdownButtonFormField<String>(value:condition,decoration:const InputDecoration(labelText:'وضعیت اولیه',border:OutlineInputBorder()),items:['عالی','خوب','متوسط','ضعیف','نیازمند بررسی'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>condition=v??condition)),
  const SizedBox(height:12),TextField(controller:notes,maxLines:3,decoration:const InputDecoration(labelText:'توضیحات، آبیاری، خاک و نور',border:OutlineInputBorder())),
  const SizedBox(height:12),Wrap(spacing:8,children:[OutlinedButton.icon(onPressed:()=>pick(ImageSource.camera),icon:const Icon(Icons.camera_alt),label:const Text('دوربین')),OutlinedButton.icon(onPressed:()=>pick(ImageSource.gallery),icon:const Icon(Icons.photo_library),label:Text(photo.isEmpty?'گالری':'عکس انتخاب شد'))]),
