@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:light_sensor/light_sensor.dart';
+import 'ambient_light_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _green = Color(0xFF167B62);
@@ -36,9 +36,9 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
   }
   Future<void> initLight() async {
     try {
-      hasLightSensor = await LightSensor.hasSensor();
+      hasLightSensor = await AmbientLightService.hasSensor();
       if (!hasLightSensor) { if (mounted) setState(() => light = 'این گوشی حسگر نور محیط ندارد.'); return; }
-      LightSensor.luxStream().listen((v) {
+      AmbientLightService.luxStream().listen((v) {
         if (!mounted) return;
         final value = v.toDouble();
         setState(() { lux = value; light = '${value.toStringAsFixed(0)} لوکس — ${lightLabel(value)}'; });
