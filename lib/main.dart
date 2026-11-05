@@ -192,7 +192,7 @@ class TrendState extends State<Trend>{
   return Scaffold(appBar:AppBar(title:const Text('نمودار وضعیت')),body:ListView(padding:const EdgeInsets.all(16),children:[
    DropdownButtonFormField<String>(value:plant.id,decoration:const InputDecoration(labelText:'انتخاب گیاه',border:OutlineInputBorder()),items:plants.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.name))).toList(),onChanged:(v)=>setState(()=>selectedId=v)),
    const SizedBox(height:14),
-   Text('روند وضعیت \${plant.name} در ۹۰ روز اخیر',style:const TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
+   Text('روند وضعیت ${plant.name} در ۹۰ روز اخیر',style:const TextStyle(fontSize:17,fontWeight:FontWeight.bold)),
    const SizedBox(height:8),
    if(entries.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(20),child:Text('در سه ماه اخیر وضعیتی ثبت نشده است. از شناسنامه گیاه، «ثبت وضعیت جدید» را انتخاب کن.')))
    else Card(elevation:0,child:Padding(padding:const EdgeInsets.fromLTRB(8,16,8,8),child:SizedBox(height:230,child:CustomPaint(painter:PlantTrendPainter(entries),size:const Size(double.infinity,230))))),
