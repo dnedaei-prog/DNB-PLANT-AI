@@ -79,6 +79,9 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
+      - name: Run automated tests
+        run: flutter test
+
       - name: Build release APK
         run: flutter build apk --release
 
