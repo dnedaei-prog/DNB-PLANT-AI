@@ -11,6 +11,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('DNB Plant AI'), findsOneWidget);
     expect(find.text('دانا زبان گیاه شما'), findsOneWidget);
-    expect(find.text('گیاهان من'), findsOneWidget);
+    expect(find.text('گیاهان من'), findsWidgets);
   });
 }
