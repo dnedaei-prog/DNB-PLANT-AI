@@ -78,12 +78,13 @@ jobs:
               if "coreLibraryDesugaring " not in g:
                   g += "\ndependencies { coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4' }\n"
               gradle.write_text(g)
-          # Generate a native Android ambient-light sensor bridge (avoids the abandoned light_sensor Gradle plugin).
+      - name: Configure native Android ambient light sensor
+        run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path("android/app/src/main/kotlin/com/dnbplantai/dnb_plant_ai/MainActivity.kt")
           p.parent.mkdir(parents=True, exist_ok=True)
-          p.write_text("""package com.dnbplantai.dnb_plant_ai
+          source = r'''package com.dnbplantai.dnb_plant_ai
 
           import android.content.Context
           import android.hardware.Sensor
@@ -138,8 +139,8 @@ jobs:
                   super.onDestroy()
               }
           }
-          """.replace("\\n          ", "\\n"))
-          PY
+          '''
+          p.write_text(source)
           PY
 
       - name: Get dependencies
