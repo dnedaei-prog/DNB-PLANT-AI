@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import 'reminder_service.dart';
 import 'smart_tools.dart';
 
@@ -16,17 +18,28 @@ class Plant{
 }
 class DnbApp extends StatefulWidget{const DnbApp({super.key});@override State<DnbApp> createState()=>DnbState();}
 class DnbState extends State<DnbApp>{
- List<Plant> plants=[];List<Map<String,dynamic>> careReminders=[];bool ready=false,reminders=true,inventoryImported=false;String lang='فارسی',quiet='۲۲:۰۰ تا ۰۸:۰۰';
+ List<Plant> plants=[];List<Map<String,dynamic>> careReminders=[];bool ready=false,reminders=true;String lang='فارسی',quiet='۲۲:۰۰ تا ۰۸:۰۰';
  @override void initState(){super.initState();load();}
- Future<void> load()async{final s=await SharedPreferences.getInstance();try{plants=(jsonDecode(s.getString('plants')??'[]') as List).map((e)=>Plant.from(e)).toList();}catch(_){}lang=s.getString('lang')??lang;reminders=s.getBool('reminders')??true;quiet=s.getString('quiet')??quiet;inventoryImported=s.getBool('initial_inventory_imported')??false;try{careReminders=List<Map<String,dynamic>>.from((jsonDecode(s.getString('care_reminders')??'[]') as List).map((e)=>Map<String,dynamic>.from(e)));}catch(_){}if(mounted)setState(()=>ready=true);}
+ Future<void> load()async{final s=await SharedPreferences.getInstance();try{plants=(jsonDecode(s.getString('plants')??'[]') as List).map((e)=>Plant.from(e)).toList();}catch(_){}lang=s.getString('lang')??lang;reminders=s.getBool('reminders')??true;quiet=s.getString('quiet')??quiet;try{careReminders=List<Map<String,dynamic>>.from((jsonDecode(s.getString('care_reminders')??'[]') as List).map((e)=>Map<String,dynamic>.from(e)));}catch(_){}if(mounted)setState(()=>ready=true);}
  Future<void> save()async{final s=await SharedPreferences.getInstance();await s.setString('plants',jsonEncode(plants.map((e)=>e.json()).toList()));await s.setString('lang',lang);await s.setBool('reminders',reminders);await s.setString('quiet',quiet);await s.setString('care_reminders',jsonEncode(careReminders));if(mounted)setState((){});}
- void add(Plant p){setState(()=>plants.insert(0,p));save();}
- Future<int> importInitialInventory()async{
-  const names=['پونه','برگ عبایی','اسپاتی‌فیلوم','فیلودندرون','آگلونما','کالانکوآ گلدار','سرخس فوجر','ریحان بنفش','نعنا فلفلی','نخل اریکا','کاج لاوسون','فیلودندرون پرتقالی','فیلودندرون کنگویی','به‌لیمو','مرجان','میخک هندی','گاردنیا'];
-  final existing=plants.map((p)=>p.name.trim()).toSet();final now=DateTime.now();int added=0;
-  for(var i=0;i<names.length;i++){final n=names[i];if(existing.contains(n))continue;final d=now.add(Duration(milliseconds:i));plants.add(Plant(id:'DNB-INIT-${(i+1).toString().padLeft(2,'0')}',name:n,place:'نامشخص',condition:'نیازمند بررسی',notes:'از فهرست اولیه کاربر وارد شده؛ وضعیت و محل نگهداری هنوز تأیید نشده است.',photo:'',created:d.toIso8601String(),active:true,history:[]));added++;}
-  inventoryImported=true;final prefs=await SharedPreferences.getInstance();await prefs.setBool('initial_inventory_imported',true);await save();return added;
+ Future<void> add(Plant p)async{setState(()=>plants.insert(0,p));await save();}
+ String newPlantId()=> 'DNB-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(0x7fffffff).toRadixString(16)}';
+ Future<String> persistPhoto(String sourcePath)async{
+  final root=await getApplicationDocumentsDirectory();
+  final folder=Directory('${root.path}/plant_photos');
+  await folder.create(recursive:true);
+  final extension=sourcePath.contains('.')?sourcePath.substring(sourcePath.lastIndexOf('.')):'.jpg';
+  final target=File('${folder.path}/plant_${DateTime.now().microsecondsSinceEpoch}${extension}');
+  return (await File(sourcePath).copy(target.path)).path;
  }
+ Future<void> removePlant(Plant plant)async{
+  plants.removeWhere((p)=>p.id==plant.id);
+  await save();
+  if(plant.photo.isNotEmpty){
+   try{final file=File(plant.photo);if(await file.exists())await file.delete();}catch(_){}
+  }
+ }
+
  Future<void> addCareReminder(Map<String,dynamic> item)async{careReminders.add(item);await save();if(reminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}
  Future<void> removeCareReminder(Map<String,dynamic> item)async{await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000);careReminders.removeWhere((x)=>x['id']==item['id']);await save();}
  Future<void> setReminderEnabled(bool enabled)async{reminders=enabled;if(enabled){for(final item in careReminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}else{for(final item in careReminders){await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000);}}await save();}
@@ -57,14 +70,19 @@ class Home extends StatelessWidget{const Home({super.key,required this.app});fin
 class Register extends StatefulWidget{const Register({super.key,required this.app});final DnbState app;@override State<Register> createState()=>RegisterState();}
 class RegisterState extends State<Register>{
  final name=TextEditingController(),notes=TextEditingController();String place='بالکن',condition='متوسط',photo='';bool active=true,busy=false;
- Future<void> pick()async{final x=await ImagePicker().pickImage(source:ImageSource.gallery,imageQuality:80,maxWidth:1600);if(x!=null)setState(()=>photo=x.path);}
- Future<void> submit()async{if(name.text.trim().isEmpty){toast(context,'نام گیاه را وارد کن');return;}setState(()=>busy=true);final d=DateTime.now();final p=Plant(id:'DNB-'+d.millisecondsSinceEpoch.toString(),name:name.text.trim(),place:place,condition:condition,notes:notes.text.trim(),photo:photo,created:d.toIso8601String(),active:active,history:[{'date':d.toIso8601String(),'condition':condition,'notes':notes.text.trim()}]);widget.app.add(p);if(!mounted)return;Navigator.pop(context);go(context,Chat(app:widget.app,initial:'برای گیاه '+p.name+' یک یادداشت مراقبتی ثبت کن.'));}
+ Future<void> pick(ImageSource source)async{
+  final x=await ImagePicker().pickImage(source:source,imageQuality:82,maxWidth:1600);
+  if(x==null)return;
+  try{final saved=await widget.app.persistPhoto(x.path);if(mounted)setState(()=>photo=saved);}
+  catch(e){if(mounted)toast(context,'ذخیره عکس ناموفق بود: $e');}
+ }
+ Future<void> submit()async{if(name.text.trim().isEmpty){toast(context,'نام گیاه را وارد کن');return;}setState(()=>busy=true);final d=DateTime.now();final p=Plant(id:widget.app.newPlantId(),name:name.text.trim(),place:place,condition:condition,notes:notes.text.trim(),photo:photo,created:d.toIso8601String(),active:active,history:[{'date':d.toIso8601String(),'condition':condition,'notes':notes.text.trim()}]);await widget.app.add(p);if(!mounted)return;Navigator.pop(context);go(context,Chat(app:widget.app,initial:'برای گیاه '+p.name+' یک یادداشت مراقبتی ثبت کن.'));}
  @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('ثبت جدید')),body:ListView(padding:const EdgeInsets.all(18),children:[
  const Text('شناسنامه اولیه گیاه',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),const SizedBox(height:14),TextField(controller:name,decoration:const InputDecoration(labelText:'نام گیاه یا نام دلخواه',hintText:'مثلاً شمعدانی شماره ۱',border:OutlineInputBorder())),
  const SizedBox(height:12),DropdownButtonFormField<String>(value:place,decoration:const InputDecoration(labelText:'محل نگهداری',border:OutlineInputBorder()),items:['بالکن','داخل منزل','حیاط','گلخانه','سایه','آفتاب مستقیم'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>place=v??place)),
  const SizedBox(height:12),DropdownButtonFormField<String>(value:condition,decoration:const InputDecoration(labelText:'وضعیت اولیه',border:OutlineInputBorder()),items:['عالی','خوب','متوسط','ضعیف','نیازمند بررسی'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>condition=v??condition)),
  const SizedBox(height:12),TextField(controller:notes,maxLines:3,decoration:const InputDecoration(labelText:'توضیحات، آبیاری، خاک و نور',border:OutlineInputBorder())),
- const SizedBox(height:12),OutlinedButton.icon(onPressed:pick,icon:const Icon(Icons.photo_library),label:Text(photo.isEmpty?'انتخاب عکس از گالری':'عکس انتخاب شد')),
+ const SizedBox(height:12),Wrap(spacing:8,children:[OutlinedButton.icon(onPressed:()=>pick(ImageSource.camera),icon:const Icon(Icons.camera_alt),label:const Text('دوربین')),OutlinedButton.icon(onPressed:()=>pick(ImageSource.gallery),icon:const Icon(Icons.photo_library),label:Text(photo.isEmpty?'گالری':'عکس انتخاب شد'))]),
  if(photo.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:8),child:ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.file(File(photo),height:180,fit:BoxFit.cover))),
  SwitchListTile(value:active,onChanged:(v)=>setState(()=>active=v),title:const Text('افزودن به «گیاهان من»'),subtitle:const Text('خاموش باشد، فقط در اطلاعات ذخیره می‌ماند')),
  const SizedBox(height:14),FilledButton(onPressed:busy?null:submit,child:const Text('ذخیره شناسنامه'))]));
@@ -74,7 +92,7 @@ class PlantList extends StatelessWidget{const PlantList({super.key,required this
 }
 class Profile extends StatefulWidget{const Profile({super.key,required this.app,required this.plant});final DnbState app;final Plant plant;@override State<Profile> createState()=>ProfileState();}
 class ProfileState extends State<Profile>{final note=TextEditingController();String condition='خوب';
- @override Widget build(BuildContext c){final p=widget.plant;return Scaffold(appBar:AppBar(title:Text(p.name)),body:ListView(padding:const EdgeInsets.all(16),children:[
+ @override Widget build(BuildContext c){final p=widget.plant;return Scaffold(appBar:AppBar(title:Text(p.name),actions:[PopupMenuButton<String>(onSelected:(v)async{if(v=='delete'){final ok=await showDialog<bool>(context:c,builder:(d)=>AlertDialog(title:const Text('حذف شناسنامه'),content:Text('اطلاعات و تاریخچه «${p.name}» حذف شود؟'),actions:[TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('انصراف')),FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('حذف'))]));if(ok==true){await widget.app.removePlant(p);if(c.mounted)Navigator.pop(c);}}},itemBuilder:(_)=>const [PopupMenuItem(value:'delete',child:Text('حذف شناسنامه'))])]),body:ListView(padding:const EdgeInsets.all(16),children:[
  if(p.photo.isNotEmpty)ClipRRect(borderRadius:BorderRadius.circular(16),child:Image.file(File(p.photo),height:210,fit:BoxFit.cover)),
  Text(p.name,style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)),Text('شناسه: '+p.id),Text('محل: '+p.place+' • وضعیت اولیه: '+p.condition),const Divider(height:28),
  const Text('ثبت وضعیت جدید',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
