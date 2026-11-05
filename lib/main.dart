@@ -3,8 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'reminder_service.dart';
 
-void main()=>runApp(const DnbApp());
+Future<void> main() async { WidgetsFlutterBinding.ensureInitialized(); try { await ReminderService.initialize(); } catch (_) {} runApp(const DnbApp()); }
 const green=Color(0xFF167B62),pale=Color(0xFFE8F4EE);
 class Plant{
  Plant({required this.id,required this.name,required this.place,required this.condition,required this.notes,required this.photo,required this.created,required this.active,List<Map<String,dynamic>>? history}):history=history??[];
@@ -14,10 +15,10 @@ class Plant{
 }
 class DnbApp extends StatefulWidget{const DnbApp({super.key});@override State<DnbApp> createState()=>DnbState();}
 class DnbState extends State<DnbApp>{
- List<Plant> plants=[];bool ready=false,reminders=true,inventoryImported=false;String lang='فارسی',quiet='۲۲:۰۰ تا ۰۸:۰۰';
+ List<Plant> plants=[];List<Map<String,dynamic>> careReminders=[];bool ready=false,reminders=true,inventoryImported=false;String lang='فارسی',quiet='۲۲:۰۰ تا ۰۸:۰۰';
  @override void initState(){super.initState();load();}
- Future<void> load()async{final s=await SharedPreferences.getInstance();try{plants=(jsonDecode(s.getString('plants')??'[]') as List).map((e)=>Plant.from(e)).toList();}catch(_){}lang=s.getString('lang')??lang;reminders=s.getBool('reminders')??true;quiet=s.getString('quiet')??quiet;inventoryImported=s.getBool('initial_inventory_imported')??false;if(mounted)setState(()=>ready=true);}
- Future<void> save()async{final s=await SharedPreferences.getInstance();await s.setString('plants',jsonEncode(plants.map((e)=>e.json()).toList()));await s.setString('lang',lang);await s.setBool('reminders',reminders);await s.setString('quiet',quiet);if(mounted)setState((){});}
+ Future<void> load()async{final s=await SharedPreferences.getInstance();try{plants=(jsonDecode(s.getString('plants')??'[]') as List).map((e)=>Plant.from(e)).toList();}catch(_){}lang=s.getString('lang')??lang;reminders=s.getBool('reminders')??true;quiet=s.getString('quiet')??quiet;inventoryImported=s.getBool('initial_inventory_imported')??false;try{careReminders=List<Map<String,dynamic>>.from((jsonDecode(s.getString('care_reminders')??'[]') as List).map((e)=>Map<String,dynamic>.from(e)));}catch(_){}if(mounted)setState(()=>ready=true);}
+ Future<void> save()async{final s=await SharedPreferences.getInstance();await s.setString('plants',jsonEncode(plants.map((e)=>e.json()).toList()));await s.setString('lang',lang);await s.setBool('reminders',reminders);await s.setString('quiet',quiet);await s.setString('care_reminders',jsonEncode(careReminders));if(mounted)setState((){});}
  void add(Plant p){setState(()=>plants.insert(0,p));save();}
  Future<int> importInitialInventory()async{
   const names=['پونه','برگ عبایی','اسپاتی‌فیلوم','فیلودندرون','آگلونما','کالانکوآ گلدار','سرخس فوجر','ریحان بنفش','نعنا فلفلی','نخل اریکا','کاج لاوسون','فیلودندرون پرتقالی','فیلودندرون کنگویی','به‌لیمو','مرجان','میخک هندی','گاردنیا'];
@@ -25,7 +26,7 @@ class DnbState extends State<DnbApp>{
   for(var i=0;i<names.length;i++){final n=names[i];if(existing.contains(n))continue;final d=now.add(Duration(milliseconds:i));plants.add(Plant(id:'DNB-INIT-${(i+1).toString().padLeft(2,'0')}',name:n,place:'نامشخص',condition:'نیازمند بررسی',notes:'از فهرست اولیه کاربر وارد شده؛ وضعیت و محل نگهداری هنوز تأیید نشده است.',photo:'',created:d.toIso8601String(),active:true,history:[]));added++;}
   inventoryImported=true;final prefs=await SharedPreferences.getInstance();await prefs.setBool('initial_inventory_imported',true);await save();return added;
  }
- void refresh(){setState((){});save();}
+ Future<void> addCareReminder(Map<String,dynamic> item)async{careReminders.add(item);await save();if(reminders){await ReminderService.schedule(id:item['id'],plant:item['plant'],title:item['title'],when:DateTime.parse(item['when']),repeat:item['repeat'],priority:item['priority'],quietHours:quiet);}}\n Future<void> removeCareReminder(Map<String,dynamic> item)async{await ReminderService.cancel(item['id']);await ReminderService.cancel(item['id']+1000000);careReminders.removeWhere((x)=>x['id']==item['id']);await save();}\n Future<void> snoozeCareReminder(Map<String,dynamic> item)async{await ReminderService.snooze(id:item['id'],plant:item['plant'],title:item['title'],priority:item['priority'],quietHours:quiet);}\n void refresh(){setState((){});save();}
  @override Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,title:'DNB Plant AI',theme:ThemeData(useMaterial3:true,colorScheme:ColorScheme.fromSeed(seedColor:green),scaffoldBackgroundColor:const Color(0xFFF5F8F5)),home:Directionality(textDirection:TextDirection.rtl,child:ready?Home(app:this):const Scaffold(body:Center(child:CircularProgressIndicator()))));
 }
 void go(BuildContext c,Widget w)=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Directionality(textDirection:TextDirection.rtl,child:w)));
@@ -37,7 +38,7 @@ class Home extends StatelessWidget{const Home({super.key,required this.app});fin
  tile(c,'ثبت جدید','ثبت عکس و وضعیت اولیه',Icons.add_a_photo,()=>go(c,Register(app:app))),
  tile(c,'گیاهان من','شناسنامه مستقل و تاریخچه هر گیاه',Icons.local_florist,()=>go(c,PlantList(app:app,active:true))),
  tile(c,'اطلاعات ذخیره','موارد ذخیره‌شده برای بررسی بعدی',Icons.bookmark,()=>go(c,PlantList(app:app,active:false))),
- tile(c,'تکثیر','راهنمای قلمه، بذر و تقسیم',Icons.content_cut,()=>go(c,const Propagation())),
+ tile(c,'یادآوری و آلارم','زمان‌بندی مراقبت و هشدارهای گیاهان',Icons.notifications_active,()=>go(c,ReminderCenter(app:app))),\n tile(c,'تکثیر','راهنمای قلمه، بذر و تقسیم',Icons.content_cut,()=>go(c,const Propagation())),
  tile(c,'گفت‌وگو با دانا','یادداشت و پرسش درباره مراقبت',Icons.chat,()=>go(c,Chat(app:app))),
  tile(c,'نمودار وضعیت','روند ثبت‌های سه ماه اخیر',Icons.show_chart,()=>go(c,Trend(app:app))),
  tile(c,'تنظیمات','زبان، یادآوری و ساعات سکوت',Icons.settings,()=>go(c,Settings(app:app))),
@@ -82,7 +83,29 @@ class ChatState extends State<Chat>{final input=TextEditingController();final me
  void send(){final s=input.text.trim();if(s.isEmpty)return;setState((){messages.add('شما: '+s);messages.add('دانا: برای بررسی دقیق‌تر، عکس گیاه و اطلاعات نور، آبیاری و خاک را در شناسنامه ثبت کن. نسخه فعلی هنوز به موتور تشخیص هوشمند و داده‌های آنلاین متصل نیست.');});input.clear();}
  @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('گفت‌وگو با دانا')),body:Column(children:[Expanded(child:messages.isEmpty?const Center(child:Text('سلام! درباره گیاهت بنویس یا از شناسنامه آن شروع کن.')):ListView(padding:const EdgeInsets.all(12),children:[for(final m in messages)Card(elevation:0,child:Padding(padding:const EdgeInsets.all(12),child:Text(m)))])),Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:input,onSubmitted:(_)=>send(),decoration:const InputDecoration(hintText:'پیامت را بنویس...',border:OutlineInputBorder()))),IconButton(onPressed:send,icon:const Icon(Icons.send,color:green))]))]));
 }
-class Trend extends StatelessWidget{const Trend({super.key,required this.app});final DnbState app;
+
+class ReminderCenter extends StatefulWidget{const ReminderCenter({super.key,required this.app});final DnbState app;@override State<ReminderCenter> createState()=>ReminderCenterState();}
+class ReminderCenterState extends State<ReminderCenter>{
+ final title=TextEditingController();DateTime date=DateTime.now().add(const Duration(days:1));TimeOfDay time=const TimeOfDay(hour:9,minute:0);String repeat='یک‌بار',plant='عمومی';int priority=0;bool busy=false;
+ @override void initState(){super.initState();final names=widget.app.plants.where((p)=>p.active).map((p)=>p.name).toList();if(names.isNotEmpty)plant=names.first;}
+ Future<void> chooseDate()async{final d=await showDatePicker(context:context,initialDate:date.isBefore(DateTime.now())?DateTime.now():date,firstDate:DateTime.now(),lastDate:DateTime.now().add(const Duration(days:730)));if(d!=null)setState(()=>date=d);}
+ Future<void> chooseTime()async{final t=await showTimePicker(context:context,initialTime:time);if(t!=null)setState(()=>time=t);}
+ Future<void> saveReminder()async{if(title.text.trim().isEmpty){toast(context,'عنوان یادآوری را بنویس');return;}var when=DateTime(date.year,date.month,date.day,time.hour,time.minute);if(repeat=='یک‌بار'&&!when.isAfter(DateTime.now())){toast(context,'زمان یادآوری باید در آینده باشد');return;}setState(()=>busy=true);final id=DateTime.now().millisecondsSinceEpoch%2000000000;final item=<String,dynamic>{'id':id,'plant':plant,'title':title.text.trim(),'when':when.toIso8601String(),'repeat':repeat,'priority':priority};try{await widget.app.addCareReminder(item);if(mounted){title.clear();toast(context,'یادآوری ذخیره و زمان‌بندی شد');}}catch(e){if(mounted)toast(context,'ذخیره شد، اما زمان‌بندی اعلان با خطا روبه‌رو شد: $e');}if(mounted)setState(()=>busy=false);}
+ @override Widget build(BuildContext c){final names=widget.app.plants.where((p)=>p.active).map((p)=>p.name).toSet().toList();if(!names.contains(plant))plant=names.isEmpty?'عمومی':names.first;return Scaffold(appBar:AppBar(title:const Text('یادآوری و آلارم')),body:ListView(padding:const EdgeInsets.all(16),children:[
+ const Text('یادآوری مراقبت',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),const SizedBox(height:10),
+ TextField(controller:title,decoration:const InputDecoration(labelText:'عنوان کار',hintText:'مثلاً بررسی رطوبت خاک یا کوددهی',border:OutlineInputBorder())),
+ const SizedBox(height:10),DropdownButtonFormField<String>(value:plant,decoration:const InputDecoration(labelText:'مربوط به کدام گیاه؟',border:OutlineInputBorder()),items:['عمومی',...names].toSet().map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>plant=v??plant)),
+ const SizedBox(height:10),Row(children:[Expanded(child:OutlinedButton.icon(onPressed:chooseDate,icon:const Icon(Icons.calendar_month),label:Text('${date.year}/${date.month}/${date.day}'))),const SizedBox(width:8),Expanded(child:OutlinedButton.icon(onPressed:chooseTime,icon:const Icon(Icons.access_time),label:Text(time.format(c))))]),
+ const SizedBox(height:10),DropdownButtonFormField<String>(value:repeat,decoration:const InputDecoration(labelText:'تکرار',border:OutlineInputBorder()),items:['یک‌بار','روزانه','هفتگی'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>repeat=v??repeat)),
+ const SizedBox(height:10),DropdownButtonFormField<int>(value:priority,decoration:const InputDecoration(labelText:'اولویت هشدار',border:OutlineInputBorder()),items:const [DropdownMenuItem(value:0,child:Text('عادی')),DropdownMenuItem(value:1,child:Text('مهم')),DropdownMenuItem(value:2,child:Text('فوری'))],onChanged:(v)=>setState(()=>priority=v??0)),
+ const SizedBox(height:8),Text('ساعات سکوت فعلی: ${widget.app.quiet}',style:const TextStyle(color:Colors.black54)),const SizedBox(height:12),FilledButton.icon(onPressed:busy?null:saveReminder,icon:const Icon(Icons.notifications_active),label:const Text('ذخیره و تنظیم آلارم')),
+ const Divider(height:30),const Text('یادآوری‌های ثبت‌شده',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+ if(widget.app.careReminders.isEmpty)const Padding(padding:EdgeInsets.all(18),child:Text('هنوز یادآوری ثبت نشده است')),
+ for(final item in widget.app.careReminders.reversed)Card(elevation:0,child:ListTile(leading:Icon(item['priority']==2?Icons.warning_amber:item['priority']==1?Icons.notifications_active:Icons.notifications,color:item['priority']==2?Colors.red:green),title:Text(item['title']),subtitle:Text('${item['plant']} • ${item['repeat']} • ${DateTime.parse(item['when']).toLocal()}'),isThreeLine:true,trailing:PopupMenuButton<String>(onSelected:(v)async{if(v=='snooze'){await widget.app.snoozeCareReminder(item);if(c.mounted)toast(c,'یک ساعت به تعویق افتاد');}else{await widget.app.removeCareReminder(item);if(mounted)setState((){});}},itemBuilder:(_)=>const [PopupMenuItem(value:'snooze',child:Text('تعویق یک‌ساعته')),PopupMenuItem(value:'delete',child:Text('حذف یادآوری'))]))),
+ const SizedBox(height:12),const Text('نکته آزمایشی: زمان‌های داخل ساعات سکوت به اولین زمان مجاز بعد از پایان سکوت منتقل می‌شوند. تکرارهای روزانه و هفتگی با ساعت محلی گوشی تنظیم می‌شوند.',style:TextStyle(fontSize:12,color:Colors.black54))
+ ]));}
+}
+\nclass Trend extends StatelessWidget{const Trend({super.key,required this.app});final DnbState app;
  @override Widget build(BuildContext c){final all=app.plants.expand((p)=>p.history.map((h)=>{'plant':p.name,...h})).toList()..sort((a,b)=>(b['date']??'').toString().compareTo((a['date']??'').toString()));final cut=DateTime.now().subtract(const Duration(days:90));final recent=all.where((h){final d=DateTime.tryParse(h['date']??'');return d!=null&&d.isAfter(cut);}).toList();return Scaffold(appBar:AppBar(title:const Text('نمودار وضعیت')),body:recent.isEmpty?const Center(child:Text('برای نمایش روند، ابتدا وضعیت گیاه را ثبت کن')):ListView(padding:const EdgeInsets.all(12),children:[const Text('ثبت‌های ۹۰ روز اخیر',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),for(final h in recent)Card(elevation:0,child:ListTile(leading:const Icon(Icons.show_chart,color:green),title:Text(h['plant'].toString()+' • '+h['condition'].toString()),subtitle:Text((h['date']??'').toString().split('T').first+'  '+(h['notes']??''))))]));}
 }
 class Propagation extends StatelessWidget{const Propagation({super.key});@override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('تکثیر')),body:ListView(padding:const EdgeInsets.all(16),children:[Text('راهنمای پایه تکثیر',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),SizedBox(height:12),Text('• قلمه ساقه: ابزار تمیز، برش زیر گره و بستر سبک و مرطوب.\n\n• قلمه برگ: فقط برای گونه‌هایی که از برگ تکثیر می‌شوند.\n\n• تقسیم بوته: هر بخش باید ریشه و جوانه مستقل داشته باشد.\n\n• بذر: عمق کاشت، دما و نور به گونه گیاه وابسته است.\n\nاین راهنما عمومی است؛ روش مناسب را برای گونه موردنظر بررسی کن.') ]));}
