@@ -57,6 +57,8 @@ jobs:
           gradle = Path("android/app/build.gradle")
           if gradle_kts.exists():
               g = gradle_kts.read_text()
+              if "multiDexEnabled" not in g:
+                  g = g.replace("defaultConfig {", "defaultConfig {\n        multiDexEnabled = true", 1)
               if "isCoreLibraryDesugaringEnabled" not in g:
                   g = g.replace("compileOptions {", "compileOptions {\n        isCoreLibraryDesugaringEnabled = true", 1)
               if "coreLibraryDesugaring(" not in g:
@@ -67,6 +69,8 @@ jobs:
               gradle_kts.write_text(g)
           elif gradle.exists():
               g = gradle.read_text()
+              if "multiDexEnabled" not in g:
+                  g = g.replace("defaultConfig {", "defaultConfig {\n        multiDexEnabled true", 1)
               if "coreLibraryDesugaringEnabled" not in g:
                   g = g.replace("compileOptions {", "compileOptions {\n        coreLibraryDesugaringEnabled true", 1)
               if "coreLibraryDesugaring " not in g:
