@@ -19,6 +19,7 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
       light = 'در حال بررسی حسگر نور...', plantResult = '', soilAdvice = '';
   String? plantPhoto, soilPhoto;
   bool busyLocation = false, busyPlant = false, hasLightSensor = false;
+  List<Map<String, dynamic>> candidates = [];
   double? lux;
   @override void initState() { super.initState(); loadKey(); initLight(); }
   Future<void> loadKey() async {
@@ -88,12 +89,12 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
   Future<void> pickPlant(ImageSource source) async {
     final f = await ImagePicker().pickImage(source: source, imageQuality: 88, maxWidth: 1800);
     if (f == null || !mounted) return;
-    setState(() { plantPhoto = f.path; plantResult = ''; });
+    setState(() { plantPhoto = f.path; plantResult = ''; candidates = []; });
     await identifyPlant(f.path);
   }
   Future<void> identifyPlant(String path) async {
     if (apiKey.isEmpty) { setState(() => plantResult = 'ابتدا کلید API رایگان Pl@ntNet را در پایین صفحه وارد و ذخیره کن.'); return; }
-    setState(() { busyPlant = true; plantResult = 'عکس در حال شناسایی است...'; });
+    setState(() { busyPlant = true; plantResult = 'عکس در حال شناسایی است...'; candidates = []; });
     try {
       final req = http.MultipartRequest('POST', Uri.https('my-api.plantnet.org',
         '/v2/identify/all', {'api-key': apiKey, 'nb-results': '5'}));
@@ -108,16 +109,20 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
       }
       final results = body['results'] as List? ?? [];
       if (results.isEmpty) { if (mounted) setState(() => plantResult = 'نتیجه‌ای پیدا نشد؛ عکس واضح‌تری از برگ یا گل بگیر.'); return; }
-      final lines = <String>[];
+      final parsed = <Map<String, dynamic>>[];
       for (final item in results.take(5)) {
         final species = item['species'] ?? {};
-        final scientific = species['scientificNameWithoutAuthor'] ?? species['scientificName'] ?? 'نام علمی نامشخص';
-        final common = (species['commonNames'] as List? ?? []).take(3).join('، ');
-        final score = ((item['score'] ?? 0) * 100).toStringAsFixed(1);
-        lines.add('$scientific${common.isEmpty ? '' : '\nنام رایج: $common'}\nاحتمال تطابق: $score٪');
+        parsed.add({
+          'scientific': species['scientificNameWithoutAuthor'] ?? species['scientificName'] ?? 'نام علمی نامشخص',
+          'common': (species['commonNames'] as List? ?? []).take(3).join('، '),
+          'score': ((item['score'] ?? 0) * 100).toDouble(),
+        });
       }
-      if (mounted) setState(() => plantResult = lines.join('\n\n'));
-    } catch (e) { if (mounted) setState(() => plantResult = e.toString().replaceFirst('Exception: ', '')); }
+      if (mounted) setState(() {
+        candidates = parsed;
+        plantResult = parsed.isEmpty ? 'نتیجه‌ای پیدا نشد؛ عکس واضح‌تری بگیر.' : '۵ نتیجه احتمالی پیدا شد. برای استفاده در شناسنامه، یکی را انتخاب کن.';
+      });
+    } catch (e) { if (mounted) setState(() { plantResult = e.toString().replaceFirst('Exception: ', ''); candidates = []; }); }
     finally { if (mounted) setState(() => busyPlant = false); }
   }
   Future<void> pickSoil(ImageSource source) async {
@@ -154,7 +159,15 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
         if (plantPhoto != null) Padding(padding: const EdgeInsets.only(top: 10),
           child: ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(plantPhoto!), height: 170, fit: BoxFit.cover))),
         if (busyPlant) const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator())),
-        if (plantResult.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: SelectableText(plantResult)),
+        if (plantResult.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(plantResult)),
+        for (var i = 0; i < candidates.length; i++) Card(
+          child: ListTile(
+            title: Text(candidates[i]['common'].toString().isEmpty ? candidates[i]['scientific'].toString() : candidates[i]['common'].toString()),
+            subtitle: Text(candidates[i]['scientific'].toString() + ' • تطابق ' + (candidates[i]['score'] as double).toStringAsFixed(1) + '٪'),
+            trailing: const Icon(Icons.check_circle_outline),
+            onTap: () => Navigator.pop(context, candidates[i]['common'].toString().isEmpty ? candidates[i]['scientific'].toString() : candidates[i]['common'].toString()),
+          ),
+        ),
         const Divider(height: 24), const Text('کلید API رایگان Pl@ntNet', style: TextStyle(fontWeight: FontWeight.w600)),
         TextField(controller: keyController, obscureText: true, decoration: const InputDecoration(hintText: 'کلید شخصی API', border: OutlineInputBorder())),
         Align(alignment: Alignment.centerRight, child: OutlinedButton(onPressed: saveKey, child: const Text('ذخیره کلید روی گوشی'))),
