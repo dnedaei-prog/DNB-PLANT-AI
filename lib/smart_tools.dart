@@ -8,6 +8,12 @@ import 'ambient_light_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _green = Color(0xFF167B62);
+
+class PlantIdentification {
+  const PlantIdentification({required this.name, required this.photoPath});
+  final String name;
+  final String photoPath;
+}
 class SmartToolsPage extends StatefulWidget {
   const SmartToolsPage({super.key});
   @override State<SmartToolsPage> createState() => _SmartToolsPageState();
@@ -165,7 +171,7 @@ class _SmartToolsPageState extends State<SmartToolsPage> {
             title: Text(candidates[i]['common'].toString().isEmpty ? candidates[i]['scientific'].toString() : candidates[i]['common'].toString()),
             subtitle: Text(candidates[i]['scientific'].toString() + ' • تطابق ' + (candidates[i]['score'] as double).toStringAsFixed(1) + '٪'),
             trailing: const Icon(Icons.check_circle_outline),
-            onTap: () => Navigator.pop(context, candidates[i]['common'].toString().isEmpty ? candidates[i]['scientific'].toString() : candidates[i]['common'].toString()),
+            onTap: () => Navigator.pop(context, PlantIdentification(name: candidates[i]['common'].toString().isEmpty ? candidates[i]['scientific'].toString() : candidates[i]['common'].toString(), photoPath: plantPhoto ?? '')),
           ),
         ),
         const Divider(height: 24), const Text('کلید API رایگان Pl@ntNet', style: TextStyle(fontWeight: FontWeight.w600)),
