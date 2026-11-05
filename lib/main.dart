@@ -51,7 +51,7 @@ class RegisterState extends State<Register>{
  const SizedBox(height:12),OutlinedButton.icon(onPressed:pick,icon:const Icon(Icons.photo_library),label:Text(photo.isEmpty?'انتخاب عکس از گالری':'عکس انتخاب شد')),
  if(photo.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:8),child:ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.file(File(photo),height:180,fit:BoxFit.cover))),
  SwitchListTile(value:active,onChanged:(v)=>setState(()=>active=v),title:const Text('افزودن به «گیاهان من»'),subtitle:const Text('خاموش باشد، فقط در اطلاعات ذخیره می‌ماند')),
- const SizedBox(height:14),FilledButton(onPressed:busy?null:submit,child:const Text('ذخیره شناسنامه'))]));}
+ const SizedBox(height:14),FilledButton(onPressed:busy?null:submit,child:const Text('ذخیره شناسنامه'))]));
 }
 class PlantList extends StatelessWidget{const PlantList({super.key,required this.app,required this.active});final DnbState app;final bool active;
  @override Widget build(BuildContext c){final items=app.plants.where((p)=>p.active==active).toList();return Scaffold(appBar:AppBar(title:Text(active?'گیاهان من':'اطلاعات ذخیره')),body:items.isEmpty?const Center(child:Text('هنوز موردی ثبت نشده است')):ListView.builder(padding:const EdgeInsets.all(12),itemCount:items.length,itemBuilder:(c,i){final p=items[i];return Card(elevation:0,child:ListTile(leading:p.photo.isEmpty?const CircleAvatar(child:Icon(Icons.local_florist)):CircleAvatar(backgroundImage:FileImage(File(p.photo))),title:Text(p.name),subtitle:Text(p.place+' • '+p.condition),trailing:const Icon(Icons.chevron_left),onTap:()=>go(c,Profile(app:app,plant:p))));}));}
