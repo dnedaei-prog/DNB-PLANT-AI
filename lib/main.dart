@@ -137,7 +137,7 @@ class HomePage extends StatelessWidget {
 }
 
 class _SectionPage extends StatelessWidget {
-  const _SectionPage({super.key, required this.section});
+  const _SectionPage({required this.section});
 
   final _Section section;
 
