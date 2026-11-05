@@ -100,7 +100,7 @@ class ReminderService {
     required String quietHours,
   }) async {
     await schedule(
-      id: id + 1000000,
+      id: id + 1000000000,
       plant: plant,
       title: 'یادآوری به تعویق افتاده: $title',
       when: DateTime.now().add(const Duration(hours: 1)),
