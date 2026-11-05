@@ -12,7 +12,7 @@ Future<void> main() async { WidgetsFlutterBinding.ensureInitialized(); try { awa
 const green=Color(0xFF167B62),pale=Color(0xFFE8F4EE);
 class Plant{
  Plant({required this.id,required this.name,required this.place,required this.condition,required this.notes,required this.photo,required this.created,required this.active,List<Map<String,dynamic>>? history}):history=history??[];
- final String id,name,place,condition,notes,photo,created;bool active;final List<Map<String,dynamic>> history;
+ final String id;String name,place,condition,notes,photo;final String created;bool active;final List<Map<String,dynamic>> history;
  Map<String,dynamic> json()=>{'id':id,'name':name,'place':place,'condition':condition,'notes':notes,'photo':photo,'created':created,'active':active,'history':history};
  factory Plant.from(Map j)=>Plant(id:j['id']??'',name:j['name']??'',place:j['place']??'',condition:j['condition']??'',notes:j['notes']??'',photo:j['photo']??'',created:j['created']??'',active:j['active']??false,history:List<Map<String,dynamic>>.from((j['history']??[]).map((e)=>Map<String,dynamic>.from(e))));
 }
@@ -109,8 +109,31 @@ class PlantList extends StatelessWidget{const PlantList({super.key,required this
  @override Widget build(BuildContext c){final items=app.plants.where((p)=>p.active==active).toList();return Scaffold(appBar:AppBar(title:Text(active?'گیاهان من':'اطلاعات ذخیره')),body:items.isEmpty?const Center(child:Text('هنوز موردی ثبت نشده است')):ListView.builder(padding:const EdgeInsets.all(12),itemCount:items.length,itemBuilder:(c,i){final p=items[i];return Card(elevation:0,child:ListTile(leading:p.photo.isEmpty?const CircleAvatar(child:Icon(Icons.local_florist)):CircleAvatar(backgroundImage:FileImage(File(p.photo))),title:Text(p.name),subtitle:Text(p.place+' • '+p.condition),trailing:const Icon(Icons.chevron_left),onTap:()=>go(c,Profile(app:app,plant:p))));}));}
 }
 class Profile extends StatefulWidget{const Profile({super.key,required this.app,required this.plant});final DnbState app;final Plant plant;@override State<Profile> createState()=>ProfileState();}
-class ProfileState extends State<Profile>{final note=TextEditingController();String condition='خوب';
- @override Widget build(BuildContext c){final p=widget.plant;return Scaffold(appBar:AppBar(title:Text(p.name),actions:[PopupMenuButton<String>(onSelected:(v)async{if(v=='delete'){final ok=await showDialog<bool>(context:c,builder:(d)=>AlertDialog(title:const Text('حذف شناسنامه'),content:Text('اطلاعات و تاریخچه «${p.name}» حذف شود؟'),actions:[TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('انصراف')),FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('حذف'))]));if(ok==true){await widget.app.removePlant(p);if(c.mounted)Navigator.pop(c);}}},itemBuilder:(_)=>const [PopupMenuItem(value:'delete',child:Text('حذف شناسنامه'))])]),body:ListView(padding:const EdgeInsets.all(16),children:[
+class ProfileState extends State<Profile>{
+ final note=TextEditingController();
+ final editName=TextEditingController(),editPlace=TextEditingController(),editNotes=TextEditingController();
+ String condition='خوب';
+ @override void initState(){super.initState();editName.text=widget.plant.name;editPlace.text=widget.plant.place;editNotes.text=widget.plant.notes;}
+ Future<void> editPlant()async{
+  final p=widget.plant;
+  final ok=await showDialog<bool>(context:context,builder:(d)=>AlertDialog(
+   title:const Text('ویرایش شناسنامه'),
+   content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+    TextField(controller:editName,decoration:const InputDecoration(labelText:'نام گیاه')),
+    TextField(controller:editPlace,decoration:const InputDecoration(labelText:'محل نگهداری')),
+    TextField(controller:editNotes,maxLines:3,decoration:const InputDecoration(labelText:'یادداشت‌ها')),
+   ])),
+   actions:[TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('انصراف')),FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('ذخیره تغییرات'))],
+  ));
+  if(ok==true&&editName.text.trim().isNotEmpty){
+   p.name=editName.text.trim();p.place=editPlace.text.trim();p.notes=editNotes.text.trim();
+   widget.app.refresh();
+   if(mounted)setState((){});
+   toast(context,'شناسنامه به‌روزرسانی شد');
+  }
+ }
+ @override void dispose(){note.dispose();editName.dispose();editPlace.dispose();editNotes.dispose();super.dispose();}
+ @override Widget build(BuildContext c){final p=widget.plant;return Scaffold(appBar:AppBar(title:Text(p.name),actions:[PopupMenuButton<String>(onSelected:(v)async{if(v=='edit'){await editPlant();}else if(v=='delete'){final ok=await showDialog<bool>(context:c,builder:(d)=>AlertDialog(title:const Text('حذف شناسنامه'),content:Text('اطلاعات و تاریخچه «${p.name}» حذف شود؟'),actions:[TextButton(onPressed:()=>Navigator.pop(d,false),child:const Text('انصراف')),FilledButton(onPressed:()=>Navigator.pop(d,true),child:const Text('حذف'))]));if(ok==true){await widget.app.removePlant(p);if(c.mounted)Navigator.pop(c);}}},itemBuilder:(_)=>const [PopupMenuItem(value:'edit',child:Text('ویرایش شناسنامه')),PopupMenuItem(value:'delete',child:Text('حذف شناسنامه'))])]),body:ListView(padding:const EdgeInsets.all(16),children:[
  if(p.photo.isNotEmpty)ClipRRect(borderRadius:BorderRadius.circular(16),child:Image.file(File(p.photo),height:210,fit:BoxFit.cover)),
  Text(p.name,style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)),Text('شناسه: '+p.id),Text('محل: '+p.place+' • وضعیت اولیه: '+p.condition),const Divider(height:28),
  const Text('ثبت وضعیت جدید',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
