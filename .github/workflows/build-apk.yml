@@ -78,6 +78,68 @@ jobs:
               if "coreLibraryDesugaring " not in g:
                   g += "\ndependencies { coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4' }\n"
               gradle.write_text(g)
+          # Generate a native Android ambient-light sensor bridge (avoids the abandoned light_sensor Gradle plugin).
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/kotlin/com/dnbplantai/dnb_plant_ai/MainActivity.kt")
+          p.parent.mkdir(parents=True, exist_ok=True)
+          p.write_text("""package com.dnbplantai.dnb_plant_ai
+
+          import android.content.Context
+          import android.hardware.Sensor
+          import android.hardware.SensorEvent
+          import android.hardware.SensorEventListener
+          import android.hardware.SensorManager
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.EventChannel
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity : FlutterActivity() {
+              private val methodName = "dnbplantai/light_sensor"
+              private val eventName = "dnbplantai/light_stream"
+              private var sensorManager: SensorManager? = null
+              private var lightSensor: Sensor? = null
+              private var eventSink: EventChannel.EventSink? = null
+              private val listener = object : SensorEventListener {
+                  override fun onSensorChanged(event: SensorEvent) {
+                      eventSink?.success(event.values.firstOrNull()?.toDouble())
+                  }
+                  override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+              }
+
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+                  lightSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LIGHT)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, methodName)
+                      .setMethodCallHandler { call, result ->
+                          if (call.method == "hasSensor") result.success(lightSensor != null)
+                          else result.notImplemented()
+                      }
+                  EventChannel(flutterEngine.dartExecutor.binaryMessenger, eventName)
+                      .setStreamHandler(object : EventChannel.StreamHandler {
+                          override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                              eventSink = events
+                              val sensor = lightSensor
+                              if (sensor == null) events?.error("NO_SENSOR", "Ambient light sensor unavailable", null)
+                              else sensorManager?.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+                          }
+                          override fun onCancel(arguments: Any?) {
+                              sensorManager?.unregisterListener(listener)
+                              eventSink = null
+                          }
+                      })
+              }
+
+              override fun onDestroy() {
+                  sensorManager?.unregisterListener(listener)
+                  eventSink = null
+                  super.onDestroy()
+              }
+          }
+          """.replace("\\n          ", "\\n"))
+          PY
           PY
 
       - name: Get dependencies
