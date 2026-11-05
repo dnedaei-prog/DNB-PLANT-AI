@@ -13,7 +13,7 @@ class ReminderService {
     tzdata.initializeTimeZones();
     final zone = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(zone.identifier));
-    await plugin.initialize(const InitializationSettings(
+    await plugin.initialize(settings: const InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     ));
     ready = true;
@@ -75,11 +75,11 @@ class ReminderService {
       category: AndroidNotificationCategory.reminder,
     ));
     await plugin.zonedSchedule(
-      id,
-      'DNB • $plant',
-      title,
-      tz.TZDateTime.from(adjusted, tz.local),
-      details,
+      id: id,
+      title: 'DNB • $plant',
+      body: title,
+      scheduledDate: tz.TZDateTime.from(adjusted, tz.local),
+      notificationDetails: details,
       androidScheduleMode: exactAllowed
           ? AndroidScheduleMode.exactAllowWhileIdle
           : AndroidScheduleMode.inexactAllowWhileIdle,
@@ -91,7 +91,7 @@ class ReminderService {
     );
   }
 
-  static Future<void> cancel(int id) => plugin.cancel(id);
+  static Future<void> cancel(int id) => plugin.cancel(id: id);
   static Future<void> snooze({
     required int id,
     required String plant,
