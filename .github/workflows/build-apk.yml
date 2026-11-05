@@ -78,6 +78,8 @@ jobs:
               if "coreLibraryDesugaring " not in g:
                   g += "\ndependencies { coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4' }\n"
               gradle.write_text(g)
+          PY
+
       - name: Configure native Android ambient light sensor
         run: |
           python3 - <<'PY'
