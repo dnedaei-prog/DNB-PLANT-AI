@@ -85,8 +85,13 @@ class Register extends StatefulWidget{const Register({super.key,required this.ap
 class RegisterState extends State<Register>{
  final name=TextEditingController(),notes=TextEditingController();String place='بالکن',condition='متوسط',photo='';bool active=true,busy=false;
  Future<void> identifyForRegistration()async{
-  final result=await Navigator.push<String>(context,MaterialPageRoute(builder:(_)=>const SmartToolsPage()));
-  if(result!=null&&result.trim().isNotEmpty&&mounted)setState(()=>name.text=result.trim());
+  final result=await Navigator.push<PlantIdentification>(context,MaterialPageRoute(builder:(_)=>const SmartToolsPage()));
+  if(result!=null&&mounted){
+   try{
+    final savedPhoto=result.photoPath.isEmpty?'':await widget.app.persistPhoto(result.photoPath);
+    if(mounted)setState(()=>{name.text=result.name,photo=savedPhoto});
+   }catch(e){if(mounted)toast(context,'نام شناسایی شد اما ذخیره عکس ناموفق بود: $e');}
+  }
  }
  Future<void> pick(ImageSource source)async{
   final x=await ImagePicker().pickImage(source:source,imageQuality:82,maxWidth:1600);
@@ -94,7 +99,7 @@ class RegisterState extends State<Register>{
   try{final saved=await widget.app.persistPhoto(x.path);if(mounted)setState(()=>photo=saved);}
   catch(e){if(mounted)toast(context,'ذخیره عکس ناموفق بود: $e');}
  }
- Future<void> submit()async{if(name.text.trim().isEmpty){toast(context,'نام گیاه را وارد کن');return;}setState(()=>busy=true);final d=DateTime.now();final p=Plant(id:widget.app.newPlantId(),name:name.text.trim(),place:place,condition:condition,notes:notes.text.trim(),photo:photo,created:d.toIso8601String(),active:active,history:[{'date':d.toIso8601String(),'condition':condition,'notes':notes.text.trim()}]);await widget.app.add(p);if(!mounted)return;Navigator.pop(context);go(context,Chat(app:widget.app,initial:'برای گیاه '+p.name+' یک یادداشت مراقبتی ثبت کن.'));}
+ Future<void> submit()async{if(name.text.trim().isEmpty){toast(context,'نام گیاه را وارد کن');return;}setState(()=>busy=true);final d=DateTime.now();final p=Plant(id:widget.app.newPlantId(),name:name.text.trim(),place:place,condition:condition,notes:notes.text.trim(),photo:photo,created:d.toIso8601String(),active:active,history:[{'date':d.toIso8601String(),'condition':condition,'notes':notes.text.trim()}]);await widget.app.add(p);if(!mounted)return;Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>Directionality(textDirection:TextDirection.rtl,child:Chat(app:widget.app,initial:'برای گیاه '+p.name+' یک یادداشت مراقبتی ثبت کن.'))));}
  @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('ثبت جدید')),body:ListView(padding:const EdgeInsets.all(18),children:[
  const Text('شناسنامه اولیه گیاه',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),const SizedBox(height:14),TextField(controller:name,decoration:const InputDecoration(labelText:'نام گیاه یا نام دلخواه',hintText:'مثلاً شمعدانی شماره ۱',border:OutlineInputBorder())),
  const SizedBox(height:8),OutlinedButton.icon(onPressed:identifyForRegistration,icon:const Icon(Icons.auto_awesome),label:const Text('شناسایی نام گیاه از عکس با دانا')),const SizedBox(height:12),DropdownButtonFormField<String>(value:place,decoration:const InputDecoration(labelText:'محل نگهداری',border:OutlineInputBorder()),items:['بالکن','داخل منزل','حیاط','گلخانه','سایه','آفتاب مستقیم'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>place=v??place)),
