@@ -89,7 +89,7 @@ class RegisterState extends State<Register>{
   if(result!=null&&mounted){
    try{
     final savedPhoto=result.photoPath.isEmpty?'':await widget.app.persistPhoto(result.photoPath);
-    if(mounted)setState(()=>{name.text=result.name,photo=savedPhoto});
+    if(mounted)setState((){name.text=result.name;photo=savedPhoto;});
    }catch(e){if(mounted)toast(context,'نام شناسایی شد اما ذخیره عکس ناموفق بود: $e');}
   }
  }
